@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mod Açık Kaynak Dönüştürücü</string>
+    <string name="subtitle">Bir mod (.jar) dosyasını Vineflower ile açık kaynak Java koduna dönüştürür</string>
+    <string name="pick_jar">Mod Dosyası (.jar) Seç</string>
+    <string name="no_file_selected">Henüz dosya seçilmedi</string>
+    <string name="decompile">Açık Kaynağa Dönüştür</string>
+    <string name="share">Paylaş</string>
+    <string name="save">Kaydet</string>
+    <string name="log_hint">Günlük burada görünecek…</string>
+    <string name="license_notice">Bu uygulama AGPLv3 lisansı ile dağıtılmaktadır. Dönüştürdüğünüz modun kaynak kodunu paylaşma hakkınızın olduğundan emin olun; bu araç yalnızca bir dönüştürme aracıdır, üçüncü taraf modların telif haklarını devretmez.</string>
+</resources>
