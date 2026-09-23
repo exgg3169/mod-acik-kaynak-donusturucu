@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.java.decompiler.main.decompiler.DecompilerRunner
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger
+import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -112,7 +113,11 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                val decompiler = DecompilerRunner(outDir, emptyMap(), logger)
+                // Android has no "jrt:" NIO filesystem provider, so Vineflower's default
+                // attempt to add the running JVM's own runtime as a library crashes with
+                // ProviderNotFoundException. Not needed for straightforward decompilation.
+                val options = mapOf(IFernflowerPreferences.INCLUDE_JAVA_RUNTIME to "0")
+                val decompiler = DecompilerRunner(outDir, options, logger)
                 decompiler.addSource(inputFile)
                 decompiler.decompileContext()
 
