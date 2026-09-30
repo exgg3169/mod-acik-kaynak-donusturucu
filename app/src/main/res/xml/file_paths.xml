@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <cache-path name="decompile_output" path="decompile_work/output/" />
+    <cache-path name="uninstaller_work" path="uninstaller-work/" />
 </paths>
