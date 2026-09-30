@@ -72,6 +72,7 @@ android {
                 showStackTraces = true
             }
         }
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -104,4 +105,10 @@ dependencies {
     // The Android SDK's unit-test stub throws "not mocked" for org.json.*; use the real
     // implementation on the unit-test classpath instead (device/emulator use the real one too).
     testImplementation("org.json:json:20231013")
+
+    // Boots the real Activity/Compose UI on the JVM so a launch crash shows its stack trace
+    // here, without needing a device or emulator.
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.test.ext:junit:1.2.1")
 }

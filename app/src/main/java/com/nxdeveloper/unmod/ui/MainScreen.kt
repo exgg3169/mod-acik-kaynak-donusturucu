@@ -159,7 +159,10 @@ fun LogoBanner() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Image(
-            painter = painterResource(R.mipmap.ic_launcher),
+            // R.mipmap.ic_launcher resolves to an <adaptive-icon> XML on API 26+, which
+            // painterResource() can't load (it only supports vectors/raster images) — use the
+            // composited raster copy in drawable/ instead.
+            painter = painterResource(R.drawable.app_logo),
             contentDescription = null,
             modifier = Modifier.size(56.dp),
         )
