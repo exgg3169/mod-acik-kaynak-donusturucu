@@ -8,7 +8,16 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-/** Talks to the Modrinth and CurseForge public APIs to search mods and list their files. */
+/**
+ * Searches mods and lists their downloadable files.
+ *
+ * Modrinth's public API is used directly (no key needed). CurseForge's own search/files API
+ * requires a key that Overwolf must manually approve per developer, so instead of that we
+ * resolve a CurseForge mod *page link the user pastes* through CFWidget (api.cfwidget.com), a
+ * free, keyless community proxy that's been used by Minecraft launchers for years. That only
+ * supports looking up a mod that's already known (by its page URL or numeric id), not full-text
+ * search — that limitation is inherent to going keyless, not something this app can work around.
+ */
 class ModBrowserRepository {
 
     suspend fun search(
@@ -18,12 +27,11 @@ class ModBrowserRepository {
         mcVersion: String,
         offset: Int,
         pageSize: Int,
-        curseForgeApiKey: String,
     ): Result<ModSearchPage> = withContext(Dispatchers.IO) {
         runCatching {
             when (provider) {
                 ModProvider.MODRINTH -> searchModrinth(query, loader, mcVersion, offset, pageSize)
-                ModProvider.CURSEFORGE -> searchCurseForge(query, loader, mcVersion, curseForgeApiKey, offset, pageSize)
+                ModProvider.CURSEFORGE -> resolveCurseForgePage(query)
             }
         }
     }
@@ -33,12 +41,11 @@ class ModBrowserRepository {
         modId: String,
         loader: ModLoader,
         mcVersion: String,
-        curseForgeApiKey: String,
     ): Result<List<ModFile>> = withContext(Dispatchers.IO) {
         runCatching {
             when (provider) {
                 ModProvider.MODRINTH -> listModrinthFiles(modId, loader, mcVersion)
-                ModProvider.CURSEFORGE -> listCurseForgeFiles(modId, loader, mcVersion, curseForgeApiKey)
+                ModProvider.CURSEFORGE -> listCurseForgeFilesViaWidget(modId)
             }
         }
     }
@@ -72,46 +79,6 @@ class ModBrowserRepository {
             )
         }
         return ModSearchPage(results, total)
-    }
-
-    private fun searchCurseForge(query: String, loader: ModLoader, mcVersion: String, apiKey: String, offset: Int, pageSize: Int): ModSearchPage {
-        require(apiKey.isNotBlank()) { "CurseForge API key is required. Add it in Settings." }
-        val index = offset.coerceIn(0, 10000 - pageSize).coerceAtLeast(0)
-        val url = buildString {
-            append("https://api.curseforge.com/v1/mods/search")
-            append("?gameId=432")
-            append("&classId=6")
-            append("&searchFilter=").append(enc(query))
-            append("&sortField=2")
-            append("&sortOrder=desc")
-            append("&pageSize=").append(pageSize)
-            append("&index=").append(index)
-            if (loader != ModLoader.ANY) append("&modLoaderType=").append(loader.curseforge)
-            if (mcVersion.isNotBlank()) append("&gameVersion=").append(enc(mcVersion.trim()))
-        }
-        val json = JSONObject(httpGet(url, mapOf("x-api-key" to apiKey, "Accept" to "application/json")))
-        val data = json.optJSONArray("data") ?: JSONArray()
-        val totalCount = (json.optJSONObject("pagination")?.optInt("totalCount", data.length()) ?: data.length())
-            .coerceAtMost(10000)
-
-        val results = ArrayList<ModHit>(data.length())
-        for (i in 0 until data.length()) {
-            val mod = data.getJSONObject(i)
-            val author = mod.optJSONArray("authors")?.takeIf { it.length() > 0 }?.getJSONObject(0)?.optString("name", "") ?: ""
-            val icon = mod.optJSONObject("logo")?.optString("thumbnailUrl", "")?.ifBlank { null }
-            results.add(
-                ModHit(
-                    provider = ModProvider.CURSEFORGE,
-                    id = mod.optLong("id").toString(),
-                    name = mod.optString("name", "Unknown"),
-                    author = author,
-                    description = mod.optString("summary", ""),
-                    iconUrl = icon,
-                    downloads = mod.optLong("downloadCount", 0),
-                ),
-            )
-        }
-        return ModSearchPage(results, totalCount)
     }
 
     private fun listModrinthFiles(modId: String, loader: ModLoader, mcVersion: String): List<ModFile> {
@@ -152,34 +119,78 @@ class ModBrowserRepository {
         return results
     }
 
-    private fun listCurseForgeFiles(modId: String, loader: ModLoader, mcVersion: String, apiKey: String): List<ModFile> {
-        require(apiKey.isNotBlank()) { "CurseForge API key is required. Add it in Settings." }
-        val url = buildString {
-            append("https://api.curseforge.com/v1/mods/").append(enc(modId)).append("/files")
-            append("?pageSize=40")
-            if (loader != ModLoader.ANY) append("&modLoaderType=").append(loader.curseforge)
-            if (mcVersion.isNotBlank()) append("&gameVersion=").append(enc(mcVersion.trim()))
-        }
-        val data = JSONObject(httpGet(url, mapOf("x-api-key" to apiKey, "Accept" to "application/json"))).optJSONArray("data") ?: JSONArray()
-        val results = ArrayList<ModFile>(data.length())
-        for (i in 0 until data.length()) {
-            val file = data.getJSONObject(i)
-            val fileName = file.optString("fileName", "")
+    /**
+     * Resolves a pasted CurseForge mod page link (or bare "game/type/slug" path, or numeric
+     * project id) via CFWidget, returning it as a single-hit "search page" so the rest of the
+     * mod-browser flow (select -> list files -> download) doesn't need a separate code path.
+     */
+    private fun resolveCurseForgePage(pastedUrlOrPath: String): ModSearchPage {
+        val path = extractCurseForgePath(pastedUrlOrPath)
+        require(path.isNotBlank()) { "Paste a CurseForge mod page link, e.g. curseforge.com/minecraft/mc-mods/jei" }
+        val json = JSONObject(httpGet("https://api.cfwidget.com/$path", emptyMap()))
+        return ModSearchPage(listOf(cfWidgetToHit(json, path)), 1)
+    }
+
+    private fun listCurseForgeFilesViaWidget(path: String): List<ModFile> {
+        val json = JSONObject(httpGet("https://api.cfwidget.com/$path", emptyMap()))
+        val filesArray = json.optJSONArray("files") ?: JSONArray()
+        val results = ArrayList<ModFile>(filesArray.length())
+        for (i in 0 until filesArray.length()) {
+            val file = filesArray.getJSONObject(i)
+            val fileName = file.optString("name", "")
             if (!fileName.endsWith(".jar")) continue
-            val downloadUrl = file.optString("downloadUrl", "").ifBlank { null }
+            val fileId = file.optLong("id")
             results.add(
                 ModFile(
-                    id = file.optLong("id").toString(),
-                    displayName = file.optString("displayName", fileName),
+                    id = fileId.toString(),
+                    displayName = file.optString("display", fileName),
                     fileName = fileName,
-                    downloadUrl = downloadUrl,
-                    sizeBytes = file.optLong("fileLength", 0),
-                    gameVersions = toStringList(file.optJSONArray("gameVersions")),
+                    downloadUrl = curseForgeDirectDownloadUrl(file.optString("url", ""), fileId),
+                    sizeBytes = file.optLong("filesize", 0),
+                    gameVersions = toStringList(file.optJSONArray("versions")),
                     loaders = emptyList(),
                 ),
             )
         }
-        return results
+        // CFWidget returns a mod's entire upload history (can be thousands for old mods);
+        // newest first, capped so the file-picker sheet stays usable.
+        return results.sortedByDescending { it.id.toLongOrNull() ?: 0L }.take(60)
+    }
+
+    private fun cfWidgetToHit(json: JSONObject, path: String): ModHit {
+        val members = json.optJSONArray("members")
+        val author = if (members != null && members.length() > 0) members.getJSONObject(0).optString("username", "") else ""
+        val downloads = json.optJSONObject("downloads")?.optLong("total", 0) ?: 0L
+        return ModHit(
+            provider = ModProvider.CURSEFORGE,
+            id = path,
+            name = json.optString("title", "Unknown"),
+            author = author,
+            description = json.optString("summary", ""),
+            iconUrl = json.optString("thumbnail", "").ifBlank { null },
+            downloads = downloads,
+        )
+    }
+
+    /** Accepts a full curseforge.com URL, a bare "game/type/slug" path, or a numeric project id. */
+    private fun extractCurseForgePath(input: String): String {
+        val trimmed = input.trim()
+        if (trimmed.toLongOrNull() != null) return trimmed
+        val withoutHost = trimmed.substringAfter("curseforge.com/", trimmed)
+        val segments = withoutHost.trim('/').split('/').filter { it.isNotBlank() }
+        return segments.take(3).joinToString("/")
+    }
+
+    /**
+     * CFWidget's file entries link to the file's *details* page (".../files/{id}"), which shows
+     * an ad interstitial before downloading. Swapping to ".../download/{id}/file" is the same
+     * redirect-straight-to-the-CDN link CurseForge's own "Download" button uses.
+     */
+    private fun curseForgeDirectDownloadUrl(detailsUrl: String, fileId: Long): String? {
+        if (detailsUrl.isBlank() || fileId <= 0) return null
+        val downloadPage = detailsUrl.replace("/files/$fileId", "/download/$fileId")
+        if (downloadPage == detailsUrl) return null
+        return "$downloadPage/file"
     }
 
     private fun toStringList(array: JSONArray?): List<String> {

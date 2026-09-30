@@ -46,27 +46,46 @@ fun ModBrowserSection(
     onFirstPage: () -> Unit,
     onLastPage: () -> Unit,
 ) {
+    val isCurseForge = browser.provider == ModProvider.CURSEFORGE
+
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ProviderToggle(browser.provider, onProviderChange)
+
+        if (isCurseForge) {
+            Text(
+                "CurseForge has no free search — paste a mod's curseforge.com page link below " +
+                    "(e.g. curseforge.com/minecraft/mc-mods/jei) and its files will load directly.",
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+            )
+        }
 
         OutlinedTextField(
             value = browser.query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Search mods") },
+            label = { Text(if (isCurseForge) "CurseForge mod page link" else "Search mods") },
         )
 
-        LoaderChips(browser.loader, onLoaderChange)
+        if (!isCurseForge) {
+            LoaderChips(browser.loader, onLoaderChange)
 
-        OutlinedTextField(
-            value = browser.mcVersion,
-            onValueChange = onMcVersionChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Minecraft version (optional)") },
-        )
+            OutlinedTextField(
+                value = browser.mcVersion,
+                onValueChange = onMcVersionChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Minecraft version (optional)") },
+            )
+        }
 
         Button(onClick = onSearch, modifier = Modifier.fillMaxWidth(), enabled = !browser.searching) {
-            Text(if (browser.searching) "Searching..." else "Search")
+            Text(
+                when {
+                    browser.searching && isCurseForge -> "Loading..."
+                    browser.searching -> "Searching..."
+                    isCurseForge -> "Load"
+                    else -> "Search"
+                },
+            )
         }
 
         browser.error?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
@@ -77,7 +96,9 @@ fun ModBrowserSection(
                     ModHitRow(hit, onClick = { onSelectMod(hit) })
                 }
             }
-            PageControls(browser.page, browser.totalPages, browser.hasPrev, browser.hasNext, onFirstPage, onPrevPage, onNextPage, onLastPage)
+            if (!isCurseForge) {
+                PageControls(browser.page, browser.totalPages, browser.hasPrev, browser.hasNext, onFirstPage, onPrevPage, onNextPage, onLastPage)
+            }
         }
     }
 }

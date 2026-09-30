@@ -39,7 +39,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val errorMessage: String? = null,
         val runInBackground: Boolean = false,
         val showSettings: Boolean = false,
-        val curseForgeApiKey: String = "",
     )
 
     data class BrowserState(
@@ -77,15 +76,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            combine(DecompileEngine.state, DecompileEngine.isRunning, settings.runInBackground, settings.curseForgeApiKey) { state, running, background, apiKey ->
-                Quad(state, running, background, apiKey)
-            }.collect { (engineState, running, background, apiKey) ->
-                applyEngineState(engineState, running, background, apiKey)
+            combine(DecompileEngine.state, DecompileEngine.isRunning, settings.runInBackground) { state, running, background ->
+                Triple(state, running, background)
+            }.collect { (engineState, running, background) ->
+                applyEngineState(engineState, running, background)
             }
         }
     }
-
-    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
     // ---- File pipeline ----
 
@@ -120,10 +117,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun reset() {
         DecompileEngine.reset()
-        _localState.value = UiState(
-            runInBackground = settings.runInBackground.value,
-            curseForgeApiKey = settings.curseForgeApiKey.value,
-        )
+        _localState.value = UiState(runInBackground = settings.runInBackground.value)
     }
 
     // ---- Settings ----
@@ -138,10 +132,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setRunInBackground(value: Boolean) {
         settings.setRunInBackground(value)
-    }
-
-    fun setCurseForgeApiKey(value: String) {
-        settings.setCurseForgeApiKey(value.trim())
     }
 
     // ---- Mod browser ----
@@ -196,7 +186,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 current.mcVersion,
                 page * current.pageSize,
                 current.pageSize,
-                settings.curseForgeApiKey.value,
             )
             result.onSuccess { pageResult ->
                 _browser.update {
@@ -219,7 +208,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _browser.update { it.copy(selectedMod = hit, loadingFiles = true, files = emptyList()) }
         val snapshot = browser.value
         filesJob = viewModelScope.launch {
-            val result = repository.listFiles(hit.provider, hit.id, snapshot.loader, snapshot.mcVersion, settings.curseForgeApiKey.value)
+            val result = repository.listFiles(hit.provider, hit.id, snapshot.loader, snapshot.mcVersion)
             result.onSuccess { files ->
                 _browser.update { it.copy(loadingFiles = false, files = files) }
             }.onFailure { error ->
@@ -235,9 +224,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---- Engine state -> UI state ----
 
-    private fun applyEngineState(engineState: DecompileOrchestrator.State, running: Boolean, runInBackground: Boolean, curseForgeApiKey: String) {
+    private fun applyEngineState(engineState: DecompileOrchestrator.State, running: Boolean, runInBackground: Boolean) {
         _localState.update { current ->
-            val base = current.copy(isRunning = running, runInBackground = runInBackground, curseForgeApiKey = curseForgeApiKey)
+            val base = current.copy(isRunning = running, runInBackground = runInBackground)
             when (engineState) {
                 is DecompileOrchestrator.State.Idle -> {
                     val stage = if (base.stage == "Done" || base.stage == "Failed") base.stage else ""

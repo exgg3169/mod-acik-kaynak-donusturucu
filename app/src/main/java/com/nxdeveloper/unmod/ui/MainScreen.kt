@@ -32,9 +32,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -99,7 +96,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 SettingsContent(
                     state = state,
                     onToggleBackground = onToggleBackground,
-                    onCurseForgeApiKey = viewModel::setCurseForgeApiKey,
                     onClose = viewModel::closeSettings,
                 )
             } else {
@@ -236,7 +232,6 @@ fun StatRow(label: String, value: String) {
 fun SettingsContent(
     state: UiState,
     onToggleBackground: (Boolean) -> Unit,
-    onCurseForgeApiKey: (String) -> Unit,
     onClose: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -247,17 +242,10 @@ fun SettingsContent(
                 checked = state.runInBackground,
                 onCheckedChange = onToggleBackground,
             )
-            var apiKey by remember(state.curseForgeApiKey) {
-                mutableStateOf(state.curseForgeApiKey)
-            }
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it; onCurseForgeApiKey(it) },
-                label = { Text("CurseForge API key") },
-                modifier = Modifier.fillMaxWidth(),
-            )
             Text(
-                "Modrinth works without a key. CurseForge requires your own key. Get one free at console.curseforge.com → API Keys.",
+                "Modrinth is searched directly, no key needed. For CurseForge, paste a mod's " +
+                    "curseforge.com page link in the browser below instead of searching — no " +
+                    "API key required either.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
