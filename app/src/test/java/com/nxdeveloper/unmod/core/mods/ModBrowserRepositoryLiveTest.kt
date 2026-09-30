@@ -64,4 +64,64 @@ class ModBrowserRepositoryLiveTest {
         assertTrue(first.fileName.endsWith(".jar"))
         println("First file: ${first.fileName} (${first.sizeBytes} bytes) -> ${first.downloadUrl}")
     }
+
+    /**
+     * CurseForge requires a per-developer API key (console.curseforge.com -> API Keys), so this
+     * only runs when one is supplied via the CURSEFORGE_API_KEY environment variable — it is
+     * never hard-coded or committed. Run locally with:
+     *   CURSEFORGE_API_KEY=... ./gradlew :app:testDebugUnitTest --tests "*CurseForge*"
+     */
+    @Test
+    fun `search curseforge for a popular mod returns hits`() = runBlocking {
+        val apiKey = System.getenv("CURSEFORGE_API_KEY")
+        assumeTrue("Skipping: set CURSEFORGE_API_KEY to test the CurseForge path", !apiKey.isNullOrBlank())
+
+        val result = repository.search(
+            provider = ModProvider.CURSEFORGE,
+            query = "jei",
+            loader = ModLoader.ANY,
+            mcVersion = "",
+            offset = 0,
+            pageSize = 5,
+            curseForgeApiKey = apiKey!!,
+        )
+
+        val page = result.getOrElse {
+            System.err.println("CurseForge search() failed: ${it}")
+            it.printStackTrace()
+            throw it
+        }
+
+        assertTrue("expected at least one hit for 'jei'", page.hits.isNotEmpty())
+        assertTrue("expected a positive total count", page.totalCount > 0)
+        val first = page.hits.first()
+        assertTrue(first.name.isNotBlank())
+        println("First CurseForge hit: ${first.name} by ${first.author} (${first.downloads} downloads)")
+    }
+
+    @Test
+    fun `listFiles for a known curseforge mod returns downloadable jars`() = runBlocking {
+        val apiKey = System.getenv("CURSEFORGE_API_KEY")
+        assumeTrue("Skipping: set CURSEFORGE_API_KEY to test the CurseForge path", !apiKey.isNullOrBlank())
+
+        // 238222 is JEI's CurseForge project id — stable across renames.
+        val result = repository.listFiles(
+            provider = ModProvider.CURSEFORGE,
+            modId = "238222",
+            loader = ModLoader.ANY,
+            mcVersion = "",
+            curseForgeApiKey = apiKey!!,
+        )
+
+        val files = result.getOrElse {
+            System.err.println("CurseForge listFiles() failed: ${it}")
+            it.printStackTrace()
+            throw it
+        }
+
+        assertTrue("expected at least one file", files.isNotEmpty())
+        val first = files.first()
+        assertTrue(first.fileName.endsWith(".jar"))
+        println("First CurseForge file: ${first.fileName} (${first.sizeBytes} bytes) -> ${first.downloadUrl}")
+    }
 }
