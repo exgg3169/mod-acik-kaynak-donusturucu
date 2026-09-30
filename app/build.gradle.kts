@@ -63,6 +63,16 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    testOptions {
+        unitTests.all {
+            it.testLogging {
+                events("passed", "skipped", "failed", "standardOut", "standardError")
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                showStackTraces = true
+            }
+        }
+    }
 }
 
 dependencies {
@@ -88,4 +98,10 @@ dependencies {
     implementation("org.benf:cfr:0.152")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    // The Android SDK's unit-test stub throws "not mocked" for org.json.*; use the real
+    // implementation on the unit-test classpath instead (device/emulator use the real one too).
+    testImplementation("org.json:json:20231013")
 }
