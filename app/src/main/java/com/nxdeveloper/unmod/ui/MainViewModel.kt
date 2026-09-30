@@ -71,6 +71,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _browser = MutableStateFlow(BrowserState())
     val browser: StateFlow<BrowserState> = _browser.asStateFlow()
 
+    val languageCode: StateFlow<String?> = settings.languageCode
+
     private var searchJob: Job? = null
     private var filesJob: Job? = null
 
@@ -132,6 +134,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setRunInBackground(value: Boolean) {
         settings.setRunInBackground(value)
+    }
+
+    fun setLanguageCode(code: String) {
+        settings.setLanguageCode(code)
     }
 
     // ---- Mod browser ----

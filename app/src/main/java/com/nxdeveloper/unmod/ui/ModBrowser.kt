@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,14 +48,14 @@ fun ModBrowserSection(
     onLastPage: () -> Unit,
 ) {
     val isCurseForge = browser.provider == ModProvider.CURSEFORGE
+    val strings = LocalStrings.current
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ProviderToggle(browser.provider, onProviderChange)
 
         if (isCurseForge) {
             Text(
-                "CurseForge has no free search — paste a mod's curseforge.com page link below " +
-                    "(e.g. curseforge.com/minecraft/mc-mods/jei) and its files will load directly.",
+                strings.curseforgeNoSearchNotice,
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
             )
         }
@@ -63,7 +64,7 @@ fun ModBrowserSection(
             value = browser.query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(if (isCurseForge) "CurseForge mod page link" else "Search mods") },
+            label = { Text(if (isCurseForge) strings.curseforgeLinkLabel else strings.searchModsLabel) },
         )
 
         if (!isCurseForge) {
@@ -73,17 +74,17 @@ fun ModBrowserSection(
                 value = browser.mcVersion,
                 onValueChange = onMcVersionChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Minecraft version (optional)") },
+                label = { Text(strings.mcVersionOptionalLabel) },
             )
         }
 
         Button(onClick = onSearch, modifier = Modifier.fillMaxWidth(), enabled = !browser.searching) {
             Text(
                 when {
-                    browser.searching && isCurseForge -> "Loading..."
-                    browser.searching -> "Searching..."
-                    isCurseForge -> "Load"
-                    else -> "Search"
+                    browser.searching && isCurseForge -> strings.loading
+                    browser.searching -> strings.searching
+                    isCurseForge -> strings.load
+                    else -> strings.search
                 },
             )
         }
@@ -91,7 +92,10 @@ fun ModBrowserSection(
         browser.error?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
 
         if (browser.hits.isNotEmpty()) {
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            // Bounded height: this list lives inside MainScreen's own verticalScroll Column,
+            // and a LazyColumn measured with an unbounded (infinite) height crashes with
+            // "Vertically scrollable component was measured with an infinity maximum height".
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
                 items(browser.hits) { hit ->
                     ModHitRow(hit, onClick = { onSelectMod(hit) })
                 }
@@ -147,14 +151,15 @@ fun GameVersionChips(selected: String, onChange: (String) -> Unit) {
 
 @Composable
 fun ModHitRow(hit: ModHit, onClick: () -> Unit) {
+    val strings = LocalStrings.current
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = onClick) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(hit.name, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Text("by ${hit.author}", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+            Text("${strings.by} ${hit.author}", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
             if (hit.description.isNotBlank()) {
                 Text(hit.description, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, maxLines = 2)
             }
-            Text("${hit.downloads} downloads · ${hit.provider.label}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
+            Text("${hit.downloads} ${strings.downloads} · ${hit.provider.label}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -192,7 +197,7 @@ fun ModFilesSheet(
             if (loading) {
                 CircularProgressIndicator(modifier = Modifier.padding(16.dp))
             } else if (files.isEmpty()) {
-                Text("No files found for this loader/version.")
+                Text(LocalStrings.current.noFilesForFilters)
             } else {
                 LazyColumn {
                     items(files) { file ->
@@ -221,7 +226,10 @@ fun PageControls(
     ) {
         PageButton("«", enabled = hasPrev, onClick = onFirst)
         PageButton("‹", enabled = hasPrev, onClick = onPrev)
-        Text("Page ${page + 1} / $totalPages", modifier = Modifier.padding(horizontal = 12.dp))
+        Text(
+            LocalStrings.current.pageOf.format(page + 1, totalPages),
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
         PageButton("›", enabled = hasNext, onClick = onNext)
         PageButton("»", enabled = hasNext, onClick = onLast)
     }

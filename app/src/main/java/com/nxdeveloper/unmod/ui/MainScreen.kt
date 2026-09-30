@@ -6,12 +6,12 @@ import android.os.Build
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -48,6 +48,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsState()
     val browser by viewModel.browser.collectAsState()
     val context = LocalContext.current
+    val strings = LocalStrings.current
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -80,7 +81,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 title = { Text("NX Uninstaller") },
                 actions = {
                     IconButton(onClick = { viewModel.openSettings() }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                        Icon(Icons.Filled.Settings, contentDescription = strings.settingsIcon)
                     }
                 },
             )
@@ -100,6 +101,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 SettingsContent(
                     state = state,
                     onToggleBackground = onToggleBackground,
+                    onLanguageChange = viewModel::setLanguageCode,
                     onClose = viewModel::closeSettings,
                 )
             } else {
@@ -118,7 +120,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     ErrorCard(state, onDismiss = viewModel::reset)
                 }
 
-                Text("Or browse mods online", style = MaterialTheme.typography.titleMedium)
+                Text(strings.browseModsOnline, style = MaterialTheme.typography.titleMedium)
                 ModBrowserSection(
                     browser = browser,
                     onQueryChange = viewModel::setQuery,
@@ -151,6 +153,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
 @Composable
 fun LogoBanner() {
+    val strings = LocalStrings.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -168,30 +171,31 @@ fun LogoBanner() {
         )
         Column {
             Text("NX Uninstaller", style = MaterialTheme.typography.headlineMedium)
-            Text("Minecraft Java Uninstaller", style = MaterialTheme.typography.bodySmall)
+            Text(strings.tagline, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
 @Composable
 fun FilePickerCard(state: UiState, onPick: () -> Unit, onClear: () -> Unit, onStart: () -> Unit) {
+    val strings = LocalStrings.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Pick a mod JAR", style = MaterialTheme.typography.titleMedium)
+            Text(strings.pickAJar, style = MaterialTheme.typography.titleMedium)
             Text(
-                if (state.pickedDisplayName.isNotBlank()) state.pickedDisplayName else "No file selected",
+                if (state.pickedDisplayName.isNotBlank()) state.pickedDisplayName else strings.noFileSelected,
                 style = MaterialTheme.typography.bodyMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onPick, enabled = !state.isRunning) { Text("Choose file") }
-                OutlinedButton(onClick = onClear, enabled = !state.isRunning && state.pickedUri != null) { Text("Clear") }
+                Button(onClick = onPick, enabled = !state.isRunning) { Text(strings.chooseFile) }
+                OutlinedButton(onClick = onClear, enabled = !state.isRunning && state.pickedUri != null) { Text(strings.clear) }
             }
             Button(
                 onClick = onStart,
                 enabled = !state.isRunning && state.pickedUri != null,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Decompile")
+                Text(strings.decompile)
             }
         }
     }
@@ -199,42 +203,45 @@ fun FilePickerCard(state: UiState, onPick: () -> Unit, onClear: () -> Unit, onSt
 
 @Composable
 fun ProgressCard(state: UiState, onCancel: () -> Unit) {
+    val strings = LocalStrings.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(state.stage, style = MaterialTheme.typography.titleMedium)
+            Text(strings.stageLabel(state.stage), style = MaterialTheme.typography.titleMedium)
             LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
             Text(state.detail, style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = onCancel) { Text("Cancel") }
+            OutlinedButton(onClick = onCancel) { Text(strings.cancel) }
         }
     }
 }
 
 @Composable
 fun ResultCard(state: UiState, onReset: () -> Unit) {
+    val strings = LocalStrings.current
     val stats = state.stats
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Done", style = MaterialTheme.typography.titleMedium)
+            Text(strings.done, style = MaterialTheme.typography.titleMedium)
             Text(state.detail, style = MaterialTheme.typography.bodyMedium)
             if (stats != null) {
-                StatRow("Total classes", stats.totalClasses.toString())
-                StatRow("Decompiled", stats.decompiled.toString())
-                StatRow("Failed", stats.failed.toString())
-                StatRow("Resources", stats.resources.toString())
+                StatRow(strings.totalClasses, stats.totalClasses.toString())
+                StatRow(strings.decompiledCount, stats.decompiled.toString())
+                StatRow(strings.failedCount, stats.failed.toString())
+                StatRow(strings.resources, stats.resources.toString())
             }
-            Button(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("Decompile another") }
+            Button(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text(strings.decompileAnother) }
         }
     }
 }
 
 @Composable
 fun ErrorCard(state: UiState, onDismiss: () -> Unit) {
+    val strings = LocalStrings.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Failed", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+            Text(strings.failed, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
             Text(state.detail, style = MaterialTheme.typography.bodyMedium)
             state.errorMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            Button(onClick = onDismiss) { Text("Dismiss") }
+            Button(onClick = onDismiss) { Text(strings.dismiss) }
         }
     }
 }
@@ -251,23 +258,24 @@ fun StatRow(label: String, value: String) {
 fun SettingsContent(
     state: UiState,
     onToggleBackground: (Boolean) -> Unit,
+    onLanguageChange: (String) -> Unit,
     onClose: () -> Unit,
 ) {
+    val strings = LocalStrings.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Settings", style = MaterialTheme.typography.titleMedium)
+            Text(strings.settingsTitle, style = MaterialTheme.typography.titleMedium)
             SettingsRow(
-                label = "Run in background",
+                label = strings.runInBackground,
                 checked = state.runInBackground,
                 onCheckedChange = onToggleBackground,
             )
-            Text(
-                "Modrinth is searched directly, no key needed. For CurseForge, paste a mod's " +
-                    "curseforge.com page link in the browser below instead of searching — no " +
-                    "API key required either.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onLanguageChange("tr") }, enabled = strings.languageCode != "tr") { Text("Türkçe") }
+                OutlinedButton(onClick = { onLanguageChange("en") }, enabled = strings.languageCode != "en") { Text("English") }
+            }
+            Text(strings.providerInfo, style = MaterialTheme.typography.bodySmall)
+            Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(strings.close) }
         }
     }
 }
