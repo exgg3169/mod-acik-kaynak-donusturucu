@@ -95,6 +95,9 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // Loads mod icon thumbnails (Modrinth/CurseForge) from their URLs.
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
     // CFR: decompiles .class files back to Java source.
     implementation("org.benf:cfr:0.152")
 

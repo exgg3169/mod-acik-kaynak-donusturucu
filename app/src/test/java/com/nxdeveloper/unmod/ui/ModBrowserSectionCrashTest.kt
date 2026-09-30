@@ -39,7 +39,7 @@ class ModBrowserSectionCrashTest {
                 name = "Mod $i",
                 author = "author-$i",
                 description = "description $i",
-                iconUrl = null,
+                iconUrl = "https://cdn.modrinth.com/data/AANobbMI/icon.png",
                 downloads = i.toLong(),
             )
         }

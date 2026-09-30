@@ -9,8 +9,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
@@ -69,13 +74,6 @@ fun ModBrowserSection(
 
         if (!isCurseForge) {
             LoaderChips(browser.loader, onLoaderChange)
-
-            OutlinedTextField(
-                value = browser.mcVersion,
-                onValueChange = onMcVersionChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(strings.mcVersionOptionalLabel) },
-            )
         }
 
         Button(onClick = onSearch, modifier = Modifier.fillMaxWidth(), enabled = !browser.searching) {
@@ -91,6 +89,8 @@ fun ModBrowserSection(
 
         browser.error?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
 
+        // Results appear right after the search button, above the version field below — so
+        // the version field gets pushed further down the screen once there's a list on top of it.
         if (browser.hits.isNotEmpty()) {
             // Bounded height: this list lives inside MainScreen's own verticalScroll Column,
             // and a LazyColumn measured with an unbounded (infinite) height crashes with
@@ -103,6 +103,15 @@ fun ModBrowserSection(
             if (!isCurseForge) {
                 PageControls(browser.page, browser.totalPages, browser.hasPrev, browser.hasNext, onFirstPage, onPrevPage, onNextPage, onLastPage)
             }
+        }
+
+        if (!isCurseForge) {
+            OutlinedTextField(
+                value = browser.mcVersion,
+                onValueChange = onMcVersionChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(strings.mcVersionOptionalLabel) },
+            )
         }
     }
 }
@@ -153,13 +162,23 @@ fun GameVersionChips(selected: String, onChange: (String) -> Unit) {
 fun ModHitRow(hit: ModHit, onClick: () -> Unit) {
     val strings = LocalStrings.current
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = onClick) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(hit.name, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Text("${strings.by} ${hit.author}", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
-            if (hit.description.isNotBlank()) {
-                Text(hit.description, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, maxLines = 2)
+        Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AsyncImage(
+                model = hit.iconUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(hit.name, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                Text("${strings.by} ${hit.author}", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+                if (hit.description.isNotBlank()) {
+                    Text(hit.description, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, maxLines = 2)
+                }
+                Text("${hit.downloads} ${strings.downloads} · ${hit.provider.label}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
             }
-            Text("${hit.downloads} ${strings.downloads} · ${hit.provider.label}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
         }
     }
 }
