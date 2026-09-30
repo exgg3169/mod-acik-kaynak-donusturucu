@@ -8,24 +8,29 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColors = darkColorScheme(
-    primary = NxGreen80,
-    secondary = NxGreenGrey80,
+    primary = NxCyan80,
+    secondary = NxPurple80,
     tertiary = NxAmber80,
+    background = Color(0xFF01020B),
+    surface = Color(0xFF0F1020),
 )
 
 private val LightColors = lightColorScheme(
-    primary = NxGreen40,
-    secondary = NxGreenGrey40,
+    primary = NxCyan40,
+    secondary = NxPurple40,
     tertiary = NxAmber40,
 )
 
 @Composable
 fun NxUnModTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    // The original app's branding (icon, name) is dark-themed; default to the app's own
+    // cyan/purple palette instead of the device wallpaper's dynamic colors.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {

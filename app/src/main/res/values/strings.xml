@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Mod Açık Kaynak Dönüştürücü</string>
+    <string name="app_name">NX Uninstaller</string>
     <string name="subtitle">Bir mod (.jar) dosyasını Vineflower ile açık kaynak Java koduna dönüştürür</string>
     <string name="pick_jar">Mod Dosyası (.jar) Seç</string>
     <string name="no_file_selected">Henüz dosya seçilmedi</string>
