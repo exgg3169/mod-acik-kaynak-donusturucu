@@ -1,0 +1,111 @@
+name: Build VenomExecutor
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: VenomExecutor
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: |
+            platforms;android-34
+            build-tools;34.0.0
+            ndk;26.1.10909125
+            cmake;3.22.1
+
+      - name: Build bootstrap DEX
+        run: |
+          ANDROID_JAR="$ANDROID_SDK_ROOT/platforms/android-34/android.jar"
+          BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/34.0.0"
+
+          mkdir -p bootstrap_build/com/venom/loader
+          cp app/src/main/assets/bootstrap_src/BootstrapApp.java bootstrap_build/com/venom/loader/
+
+          javac -source 8 -target 8 \
+            -cp "$ANDROID_JAR" \
+            -d bootstrap_build/classes \
+            bootstrap_build/com/venom/loader/BootstrapApp.java
+
+          "$BUILD_TOOLS/d8" \
+            $(find bootstrap_build/classes -name "*.class") \
+            --classpath "$ANDROID_JAR" \
+            --output bootstrap_build/dex/ \
+            --min-api 26
+
+          cp bootstrap_build/dex/classes.dex app/src/main/assets/scripts/bootstrap.dex
+          echo "Bootstrap DEX built: $(wc -c < app/src/main/assets/scripts/bootstrap.dex) bytes"
+
+      - name: Grant execute permission to gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        id: build_debug
+        run: |
+          ./gradlew assembleDebug 2>&1 | tee build_debug.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Build Release APK
+        id: build_release
+        run: |
+          ./gradlew assembleRelease 2>&1 | tee build_release.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Collect error log on failure
+        if: steps.build_debug.outputs.exit_code != '0' || steps.build_release.outputs.exit_code != '0'
+        run: |
+          cat build_debug.log build_release.log 2>/dev/null > error.txt
+          echo "--- GRADLE PROPERTIES ---" >> error.txt
+          cat gradle.properties >> error.txt
+
+      - name: Upload error artifact
+        if: steps.build_debug.outputs.exit_code != '0' || steps.build_release.outputs.exit_code != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: error
+          path: VenomExecutor/error.txt
+
+      - name: Get APK info
+        if: steps.build_debug.outputs.exit_code == '0' || steps.build_release.outputs.exit_code == '0'
+        run: |
+          echo "## APK Outputs" >> $GITHUB_STEP_SUMMARY
+          for apk in $(find app/build/outputs/apk -name "*.apk" 2>/dev/null); do
+            size=$(du -sh "$apk" | cut -f1)
+            echo "- \`$apk\` ($size)" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: Upload Debug APK
+        if: steps.build_debug.outputs.exit_code == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VenomExecutor-debug
+          path: VenomExecutor/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload Release APK
+        if: steps.build_release.outputs.exit_code == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VenomExecutor-release
+          path: VenomExecutor/app/build/outputs/apk/release/*.apk
