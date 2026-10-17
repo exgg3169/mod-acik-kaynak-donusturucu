@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: VenomExecutor
@@ -24,22 +24,23 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-          packages: |
-            platforms;android-34
-            build-tools;34.0.0
-            ndk;26.1.10909125
-            cmake;3.22.1
+      - name: Install Android SDK components
+        run: |
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;26.1.10909125" \
+            "cmake;3.22.1" 2>&1 | tail -5
+          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
 
       - name: Build bootstrap DEX
         run: |
           ANDROID_JAR="$ANDROID_SDK_ROOT/platforms/android-34/android.jar"
           BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/34.0.0"
 
-          mkdir -p bootstrap_build/com/venom/loader
+          mkdir -p bootstrap_build/com/venom/loader bootstrap_build/classes bootstrap_build/dex
           cp app/src/main/assets/bootstrap_src/BootstrapApp.java bootstrap_build/com/venom/loader/
 
           javac -source 8 -target 8 \
@@ -74,14 +75,16 @@ jobs:
         continue-on-error: true
 
       - name: Collect error log on failure
-        if: steps.build_debug.outputs.exit_code != '0' || steps.build_release.outputs.exit_code != '0'
+        if: always() && (steps.build_debug.outputs.exit_code != '0' || steps.build_release.outputs.exit_code != '0' || steps.build_debug.outcome == 'failure' || steps.build_release.outcome == 'failure')
         run: |
-          cat build_debug.log build_release.log 2>/dev/null > error.txt
+          { cat build_debug.log 2>/dev/null; cat build_release.log 2>/dev/null; } > error.txt
           echo "--- GRADLE PROPERTIES ---" >> error.txt
           cat gradle.properties >> error.txt
+          echo "--- ANDROID SDK ---" >> error.txt
+          ls $ANDROID_SDK_ROOT/ndk/ 2>/dev/null >> error.txt || echo "no NDK" >> error.txt
 
       - name: Upload error artifact
-        if: steps.build_debug.outputs.exit_code != '0' || steps.build_release.outputs.exit_code != '0'
+        if: always() && (steps.build_debug.outputs.exit_code != '0' || steps.build_release.outputs.exit_code != '0' || steps.build_debug.outcome == 'failure' || steps.build_release.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: error
